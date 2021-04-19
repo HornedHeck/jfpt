@@ -10,8 +10,7 @@ import java.util.*
 import kotlin.system.exitProcess
 
 
-private const val NAME_KEY = "--name"
-private const val PASS_KEY = "--pass"
+const val SERVER_CONTROL_PORT = 8954
 
 private val commandsMap = mapOf(
     "ls" to LIST,
@@ -22,12 +21,12 @@ private val commandsMap = mapOf(
     "account" to ACCT,
     "quit" to QUIT,
     "port" to PORT,
-//    "passive" to PASV,
-    "retrieve" to RETR
+    "pasv" to PASV,
+    "get" to RETR,
+    "mkdir" to MKD
 )
 
-class FtpClient(host: String, port: Int, args: Map<String, String>) {
-
+class FtpClient(host: String, port: Int) {
 
     private val processor = FtpProcessor(host, port)
 
@@ -76,9 +75,11 @@ class FtpClient(host: String, port: Int, args: Map<String, String>) {
 
 }
 
-fun main(args: Array<String>) {
+fun main() {
 
-    val client = FtpClient("0.0.0.0", 21, emptyMap())
+    setupServer()
+
+    val client = FtpClient("0.0.0.0", SERVER_CONTROL_PORT)
 
     client.start()
 

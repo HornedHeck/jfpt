@@ -17,34 +17,63 @@ private fun Response.Type.toUseCaseResult() = when (this) {
 
 class DataUseCase(private val processor: FtpProcessor) : BaseUseCase() {
 
-    //    private var isServerActive = true
-    private var dataPort = processor.sockerPort
-
     override val commands = listOf(
         Command.PORT,
         Command.RETR,
-        Command.LIST
+        Command.LIST,
+        Command.PASV,
     )
 
     override fun start(command: Command, args: Array<String>) = when (command) {
         Command.PORT -> proceedPortCommand(args)
+        Command.LIST -> proceedList(args)
+        Command.PASV -> proceedPasv()
+        Command.RETR -> proceedRetr(args)
         else -> ERROR
     }
 
-    private fun proceedPortCommand(args: Array<String>): UseCaseResult {
-        val rawPort = args.getOrNull(0)?.toInt() ?: processor.sockerPort
-        dataPort = rawPort - 1
-        val address = processor.socketAddress.address
-        val portH = (dataPort / 256)
-        val portL = (dataPort % 256)
-        val formattedArgs = "$192,168,0,108,$portH,$portL"
-        return processor.execute(Command.PORT, formattedArgs).type.toUseCaseResult()
+    private fun proceedList(args: Array<String>): UseCaseResult {
+        val res = processor.executeWithData(Command.LIST , args)
+        if (res.data.isNotEmpty()){
+            println(res.data)
+        }
+        return res.type.toUseCaseResult()
     }
 
-//    private fun executeRetr(args: Array<String>): UseCaseResult {
-//        processor.send(Command.RETR, args)
-//        val res = processor.receive()
-//        if (res.type != Response.Type.POSITIVE_1) return res.type.toUseCaseResult()
-//    }
+    private fun proceedPortCommand(args: Array<String>): UseCaseResult {
+        val port = args.getOrNull(0)?.toInt() ?: processor.dataPort
+        val address = processor.address.hostAddress.replace(".", ",") + ",${port / 256},${port % 256}"
+        val res = processor.execute(Command.PORT, address)
+        if (res.isSuccessful) {
+            processor.setMode(true, port)
+        }
+        return res.type.toUseCaseResult()
+    }
+
+    private fun proceedPasv(): UseCaseResult {
+        val res = processor.execute(Command.PASV)
+        if (res.isSuccessful) {
+            processor.setMode(false, extractPort(res))
+        }
+        return res.type.toUseCaseResult()
+    }
+
+    private fun extractPort(res: Response): Int {
+        val rawPort = res.body
+            .substringAfter('(')
+            .substringBefore(')')
+            .split(",")
+            .takeLast(2)
+
+        return rawPort[0].toInt() * 256 + rawPort[1].toInt()
+    }
+
+    private fun proceedRetr(args: Array<String>): UseCaseResult {
+        val res = processor.executeWithData(Command.RETR , args)
+        if (res.data.isNotEmpty()){
+            println(res.data)
+        }
+        return res.type.toUseCaseResult()
+    }
 
 }

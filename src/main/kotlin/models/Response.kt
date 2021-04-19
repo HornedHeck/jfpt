@@ -20,3 +20,18 @@ data class Response(val code: Int, val body: String) {
     }
 
 }
+
+fun Response.addData(data : String) = DataResponse(code, body, data)
+
+
+data class DataResponse(val code: Int, val body: String,val data: String) {
+
+    override fun toString(): String {
+        return "$code $body"
+    }
+
+    val type = Response.Type.values()[code / 100 - 1]
+
+    val isSuccessful = type == Response.Type.POSITIVE_2
+
+}

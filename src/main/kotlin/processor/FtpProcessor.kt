@@ -1,21 +1,36 @@
 package processor
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancel
 import models.Command
+import models.DataResponse
 import models.Response
+import models.addData
 import java.io.BufferedOutputStream
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.io.PrintStream
+import java.net.ServerSocket
 import java.net.Socket
 
 class FtpProcessor(private val host: String, private val port: Int = 21) {
 
     private val socket: Socket = Socket(host, port)
-    val sockerPort
-        get() = socket.localPort
 
-    val socketAddress
-        get() = socket.inetAddress
+    val address = socket.localAddress
+
+    private var mode: FtpMode = FtpMode.PORT
+    var dataPort: Int = socket.localPort - 1
+        private set
+
+    fun setMode(isActive: Boolean, port: Int) {
+        mode = if (isActive) {
+            FtpMode.PORT
+        } else {
+            FtpMode.PASV
+        }
+        dataPort = port
+    }
 
     private val reader: BufferedReader = BufferedReader(InputStreamReader(socket.getInputStream()))
     private val writer: PrintStream = PrintStream(BufferedOutputStream(socket.getOutputStream()), true)
@@ -47,15 +62,48 @@ class FtpProcessor(private val host: String, private val port: Int = 21) {
 
     fun execute(command: Command, vararg args: String): Response {
         send(command, args)
-        var res = receive()
-        while (reader.ready()) {
-            res = receive()
-        }
-        return res
+        return receive()
     }
 
     fun close() {
         socket.close()
+    }
+
+    private val context = Dispatchers.IO
+
+    fun executeWithData(command: Command, args: Array<out String>): DataResponse {
+        return when (mode) {
+            FtpMode.PORT -> {
+                val serverSocket = ServerSocket(dataPort)
+                send(command, args)
+                val firstResponse = receive()
+                if (firstResponse.type != Response.Type.POSITIVE_1)
+                    return firstResponse.addData("")
+                val connection = serverSocket.accept()
+                val data = InputStreamReader(connection.getInputStream()).readText()
+                serverSocket.close()
+                receive().addData(data)
+            }
+            FtpMode.PASV -> {
+                send(command, args)
+                val firstResponse = receive()
+                if (firstResponse.type != Response.Type.POSITIVE_1)
+                    return firstResponse.addData("")
+
+                val connection = Socket(host, dataPort)
+                val data = InputStreamReader(connection.getInputStream()).readText()
+                receive().addData(data)
+            }
+        }
+    }
+
+    fun stopReceiving() {
+        context.cancel()
+    }
+
+    enum class FtpMode {
+        PASV,
+        PORT
     }
 
 }
