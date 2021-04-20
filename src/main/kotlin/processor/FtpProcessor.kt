@@ -97,6 +97,33 @@ class FtpProcessor(private val host: String, private val port: Int = 21) {
         }
     }
 
+    fun sendData(command: Command , data: String, path: String): Response {
+        return when (mode) {
+            FtpMode.PORT -> {
+                val serverSocket = ServerSocket(dataPort)
+                send(command, arrayOf(path))
+                val firstResponse = receive()
+                if (firstResponse.type != Response.Type.POSITIVE_1)
+                    return firstResponse
+                val connection = serverSocket.accept()
+                PrintStream(connection.getOutputStream(), true).println(data)
+                connection.close()
+                serverSocket.close()
+                receive()
+            }
+            FtpMode.PASV -> {
+                send(command, arrayOf(path))
+                val firstResponse = receive()
+                if (firstResponse.type != Response.Type.POSITIVE_1)
+                    return firstResponse
+
+                val connection = Socket(host, dataPort)
+                PrintStream(connection.getOutputStream(), true).println(data)
+                receive()
+            }
+        }
+    }
+
     fun stopReceiving() {
         context.cancel()
     }

@@ -9,7 +9,7 @@ import processor.FtpProcessor
 class RepeateableUseCase(private val processor: FtpProcessor) : BaseUseCase() {
 
     override val commands = listOf(
-        Command.APPE, Command.NLST, Command.REIN, Command.STOR, Command.STOU
+        Command.APPE, Command.NLST, Command.REIN, Command.STOU
     )
 
     override fun start(command: Command, args: Array<String>) = when (processor.execute(command, *args).type) {
