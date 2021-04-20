@@ -28,7 +28,8 @@ private val commandsMap = mapOf(
     "syst" to SYST,
     "status" to STAT,
     "rmdir" to RMD,
-    "send" to STOR
+    "send" to STOR,
+    "rm" to DELE
 )
 
 class FtpClient(host: String, port: Int) {
